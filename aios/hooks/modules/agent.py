@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, Future
 from random import randint
-from typing import Any, Tuple, Callable, Dict
+from typing import Any, Tuple, Callable, Dict, List, Optional
 from aios.hooks.types.agent import AgentSubmitDeclaration, FactoryParams
 from aios.hooks.utils.validate import validate
 from aios.hooks.stores import queue as QueueStore, processes as ProcessStore
@@ -35,7 +35,7 @@ def useFactory(
         Submits an agent for execution and returns a unique process ID.
 
         Args:
-            declaration_params (AgentSubmitDeclaration): Parameters to declare the agent submission.
+            declaration_params (AgentSubmitDeclaration): Parameters including task input and attachments
 
         Returns:
             int: A unique process ID for the submitted agent.
@@ -44,6 +44,7 @@ def useFactory(
             agent_factory.run_agent,
             declaration_params.agent_name,
             declaration_params.task_input,
+            declaration_params.attachments,
         )
 
         # Generate a unique process ID

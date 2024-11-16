@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, TypeAlias, Callable
+from typing import Any, TypeAlias, Callable, Optional, List, Union
 
 class AgentParserParams(BaseModel):
     llm: Any
@@ -13,4 +13,5 @@ class FactoryParams(BaseModel):
 
 class AgentSubmitDeclaration(BaseModel):
     agent_name: str
-    task_input: str | int | float | dict | tuple | list
+    task_input: Union[str, int, float, dict, tuple, list]
+    attachments: Optional[List[str]] = None

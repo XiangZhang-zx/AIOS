@@ -29,7 +29,6 @@ const updateChatName = (chatId: number, newName: string) => {
 
 
 
-
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [darkMode, setDarkMode] = useState<boolean>(true);
@@ -62,24 +61,33 @@ const ChatInterface: React.FC = () => {
     content: string;
   }
 
+  interface CommandResponse {
+    name: string | undefined;
+    content: string;
+    attachments?: string[];
+  }
 
-  function parseNamedContent(inputString: string) {
-    // Regular expression to match the pattern ?>>Name/?>>\s*Content
+  function parseNamedContent(inputString: string, attachments?: string[]): AgentCommand[] {
     const regex = /\?>>(.*?)\/?>>([^?]*)/g;
-    const results = [];
+    const results: AgentCommand[] = [];
 
-    // Find all matches
     let match;
     while ((match = regex.exec(inputString)) !== null) {
-      // Extract name and content, trim whitespace
       const name = match[1].trim().slice(0, -2);
-      // Preserve newlines in content but trim surrounding whitespace
       const content = match[2].replace(/^\s+|\s+$/g, '');
 
-      results.push({
+      // Only add attachments if they exist
+      const command: AgentCommand = {
         name,
         content
-      });
+      };
+      
+      // Only add attachments property if there are attachments
+      if (attachments && attachments.length > 0) {
+        command.attachments = attachments;
+      }
+
+      results.push(command);
     }
 
     return results;
@@ -94,19 +102,39 @@ const ChatInterface: React.FC = () => {
 
   const handleSend = async (content: string, attachments: File[]) => {
     if (content.trim() || attachments.length > 0) {
+      let uploadedFiles: string[] = [];
+      
+      // Handle file uploads
+      if (attachments.length > 0) {
+        const uploads = await Promise.all(
+          attachments.map(async (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+              const response = await axios.post(`${baseUrl}/api/upload`, formData);
+              return response.data.url;
+            } catch (error) {
+              console.error('File upload failed:', error);
+              return null;
+            }
+          })
+        );
+        uploadedFiles = uploads.filter(url => url !== null);
+      }
+
       const newMessage: Message = {
         id: generateSixDigitId(),
         text: content,
         sender: 'user',
         timestamp: new Date(),
-        attachments: attachments.map(file => file.name),
+        attachments: uploadedFiles,
         thinking: false
       };
-      setMessages([...messages, newMessage]);
+
+      // Use functional update to ensure state correctness
+      setMessages(prevMessages => [...prevMessages, newMessage]);
 
       const messageId = generateSixDigitId();
-
-      // Handle file uploads here (e.g., to a server)
       const botMessage: Message = {
         id: messageId,
         text: ``,
@@ -117,17 +145,37 @@ const ChatInterface: React.FC = () => {
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
 
-      const res = await processAgentCommand(parseNamedContent(parseText(content))[0] as AgentCommand)
+      try {
+        const command = parseNamedContent(parseText(content), uploadedFiles)[0];
+        const res = await processAgentCommand(command as AgentCommand);
 
-      setMessages(prevMessages => [...prevMessages].map(message => {
-        if (message.id == messageId) {
-          return { ...message, thinking: false, text: res.content };
-        }
-        // return res.content;
-        return message;
-      }));
+        setMessages(prevMessages => 
+          prevMessages.map(message => 
+            message.id === messageId 
+              ? { 
+                  ...message, 
+                  thinking: false, 
+                  text: res.content,
+                  attachments: res.attachments
+                }
+              : message
+          )
+        );
+      } catch (error) {
+        console.error('Error processing command:', error);
+        setMessages(prevMessages => 
+          prevMessages.map(message => 
+            message.id === messageId 
+              ? { 
+                  ...message, 
+                  thinking: false, 
+                  text: "Error processing your request. Please try again.",
+                }
+              : message
+          )
+        );
+      }
     }
-
   };
 
   const addChat = () => {
@@ -136,13 +184,21 @@ const ChatInterface: React.FC = () => {
     setActiveChat(newChat.id);
   };
 
-  const processAgentCommand = async (command: AgentCommand) => {
+  const processAgentCommand = async (command: AgentCommand): Promise<CommandResponse> => {
     // Temporary measure to prevent hanging until draft is published
     if (!command) {
       return {
         name: undefined,
         content: "You must provide a mention to use AIOS. (@example/...)",
+        attachments: undefined
       }
+    }
+
+    // Handle image attachments (if any)
+    let taskInput = command.content;
+    if (command.attachments && command.attachments.length > 0) {
+      const attachmentUrls = command.attachments.map(url => `${baseUrl}${url}`);
+      taskInput = `${command.content}\n\nImage Content：${attachmentUrls.join('\n')}\n\nPlease answer the question based on the image content above.`;
     }
 
     const addAgentResponse = await axios.post(`${baseUrl}/api/proxy`, {
@@ -150,7 +206,9 @@ const ChatInterface: React.FC = () => {
       url: `${serverUrl}/add_agent`,
       payload: {
         agent_name: command.name,
-        task_input: command.content,
+        task_input: taskInput,
+        attachments: command.attachments?.map(url => `${baseUrl}${url}`),
+        has_image: command.attachments && command.attachments.length > 0
       }
     });
 
@@ -175,16 +233,18 @@ const ChatInterface: React.FC = () => {
         recent_response = "Agent Had Difficulty Thinking"
       }
     } catch (e) {
-      recent_response = "Agent Had Difficulty Thinking"
+      recent_response = command.attachments && command.attachments.length > 0 
+        ? "Error processing image. Please ensure:\n1. Image format is supported (JPG/PNG/GIF/WebP)\n2. Image size is under 5MB\n3. Verify if the current agent supports image processing"
+        : "Agent Had Difficulty Thinking";
     }
 
-
-    //return recent_response
+    // Always return attachments in the response
     return {
       name: command.name,
-      content: recent_response
+      content: recent_response,
+      attachments: command.attachments
     };
-  }
+  };
 
   const mounted = useMounted();
 

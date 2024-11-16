@@ -1,40 +1,62 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma'
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
-export async function POST(request: Request): Promise<NextResponse> {
-    if (request.body) {
-        const body = await request.json();
-        
-        // Destructure the body to separate agent data from files
-        const { author, name, version, license, files, ...otherData } = body;
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-        try {
-            const result = await prisma.agent.create({
-                data: {
-                    author,
-                    name,
-                    version,
-                    license,
-                    ...otherData,
-                    files: {
-                        //@ts-ignore
-                        create: files.map((file: any) => ({
-                            path: file.path,
-                            content: file.content
-                        }))
-                    }
-                },
-                include: {
-                    files: true
-                }
-            });
-
-            return NextResponse.json(result);
-        } catch (error) {
-            console.error('Error creating agent:', error);
-            return NextResponse.json({ status: 'error', message: 'Failed to create agent' }, { status: 500 });
-        }
-    } else {
-        return NextResponse.json({ status: 'fail', message: 'No body provided' }, { status: 400 });
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file received' },
+        { status: 400 }
+      );
     }
+
+    // Validate file type
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File size too large' },
+        { status: 400 }
+      );
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const fileName = `${Date.now()}-${file.name}`;
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    
+    // Ensure upload directory exists
+    try {
+      await mkdir(uploadDir, { recursive: true });
+    } catch (err) {
+      // Ignore error if directory already exists
+    }
+
+    const filePath = path.join(uploadDir, fileName);
+    await writeFile(filePath, buffer);
+    
+    return NextResponse.json({
+      url: `/uploads/${fileName}`,
+    });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    return NextResponse.json(
+      { error: 'Error uploading file' },
+      { status: 500 }
+    );
+  }
 }

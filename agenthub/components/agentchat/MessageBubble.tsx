@@ -37,6 +37,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, darkMode,
         </div>
         <div className={`mt-1 text-sm break-words ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
           {isThinking ? <AgentLoader /> : <Markdown content={message.text} darkMode={darkMode} animation={message.sender === 'user' ? false : true} />}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="attachments-container mt-2">
+              {message.attachments.map((url, i) => (
+                <div key={i} className="attachment-item">
+                  {url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                    <img src={url} alt="attachment" className="max-w-[200px] rounded" />
+                  ) : (
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500">
+                      Attachment {i + 1}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

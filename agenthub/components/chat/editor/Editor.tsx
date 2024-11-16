@@ -107,6 +107,9 @@ export const ChatEditor: React.FC<ChatEditorProps> = ({ onSend, darkMode }) => {
         editor.commands.setContent('');
         setAttachments([]);
         setPreviews([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   }, [editor, attachments, onSend]);
@@ -114,9 +117,13 @@ export const ChatEditor: React.FC<ChatEditorProps> = ({ onSend, darkMode }) => {
   const handleAttachment = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
+      // Only process newly selected files
       const newAttachments = Array.from(files);
-      setAttachments(prev => [...prev, ...newAttachments]);
+      setAttachments(newAttachments); // Set new files directly
       
+      setPreviews([]); // Clear previous previews
+      
+      // Create previews for new files
       newAttachments.forEach(file => {
         if (file.type.startsWith('image/')) {
           const reader = new FileReader();
