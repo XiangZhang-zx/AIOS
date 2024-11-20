@@ -1,10 +1,20 @@
-export const inDevEnvironment = !!process && process.env.NODE_ENV === 'development';
-// export const serverUrl = inDevEnvironment ? 'http://localhost:8000' : 'https://myapp-y5z35kuonq-uk.a.run.app'
-export const baseUrl = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3000'
+const getNodeEnv = () => {
+  try {
+    return process?.env?.NODE_ENV || 'development';
+  } catch {
+    return 'development';
+  }
+};
+
+export const inDevEnvironment = getNodeEnv() === 'development';
+
+export const baseUrl = inDevEnvironment 
+  ? 'http://localhost:3000' 
   : 'https://my.aios.foundation';
-// export const serverUrl = inDevEnvironment ? 'http://localhost:8000' : 'http://35.232.56.61:8000'
-export const serverUrl = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8000'
-  : 'https://api.aios.chat';
+
+// Use fixed server address
+export const serverUrl = 'http://35.232.56.61:8000';
+
+// Add agentApiUrl for agents endpoints
+export const agentApiUrl = 'https://my.aios.foundation';
 
