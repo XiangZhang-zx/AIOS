@@ -3,9 +3,14 @@ import importlib
 import os
 import time
 
-from aios.hooks.syscall import send_request
+# from aios.hooks.syscall import send_request
+# from aios.hooks.syscall import useSysCall
+from cerebrum.client import Cerebrum
+from cerebrum.interface import AutoLLM
 
-from pyopenagi.utils.chat_template import LLMQuery, MemoryQuery, StorageQuery
+from cerebrum.llm.communication import LLMQuery
+
+from cerebrum import config
 
 from pyopenagi.utils.logger import AgentLogger
 
@@ -22,6 +27,10 @@ class AcademicAgent:
 
         self.plan_max_fail_times = 3
         self.tool_call_max_fail_times = 3
+
+        config.global_client = Cerebrum()
+
+        self.send_request = AutoLLM.from_dynamic().process
 
         # self.agent_process_factory = agent_process_factory
 
@@ -118,7 +127,7 @@ class AcademicAgent:
 
     def automatic_workflow(self):
         for i in range(self.plan_max_fail_times):
-            response = send_request(
+            response = self.send_request(
                 agent_name=self.agent_name,
                 query=LLMQuery(
                     messages=self.messages, tools=None, message_return_type="json"
@@ -209,7 +218,7 @@ class AcademicAgent:
                     else:
                         selected_tools = None
 
-                    response = send_request(
+                    response = self.send_request(
                         agent_name=self.agent_name,
                         query=LLMQuery(
                             messages=self.messages,
@@ -230,10 +239,6 @@ class AcademicAgent:
                     "agent_name": self.agent_name,
                     "result": final_result,
                     "rounds": self.rounds,
-                    # "agent_waiting_time": self.start_time - self.created_time,
-                    # "agent_turnaround_time": self.end_time - self.created_time,
-                    # "request_waiting_times": self.request_waiting_times,
-                    # "request_turnaround_times": self.request_turnaround_times,
                 }
 
             else:
