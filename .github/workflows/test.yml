@@ -1,13 +1,13 @@
-# This workflow will test AIOS application on aios_v0.2 branch
+# This workflow will test AIOS application on main branch
 # It will set up Python environment, install dependencies, run AIOS kernel and test agent execution
 
-name: AIOS application
+name: AIOS Application
 
 on:
   push:
-    branches: [ "aios_v0.2" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "aios_v0.2" ]
+    branches: [ "main" ]
 
 permissions:
   contents: read
@@ -20,38 +20,38 @@ jobs:
     # Check out repository code and specify branch
     - uses: actions/checkout@v4
       with:
-        ref: aios_v0.2  # Specify the branch to checkout
-        
+        ref: main  # Changed to main branch
+       
     # Set up Python environment
     - name: Set up Python 3.10
       uses: actions/setup-python@v3
       with:
         python-version: "3.10"
-        
+       
     # Install project dependencies
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        
+       
     # Clone Cerebrum repository
     - name: Git Clone Action
       uses: sudosubin/git-clone-action@v1.0.1
       with:
         repository: agiresearch/Cerebrum
         path: Cerebrum
-        
+       
     # Install Cerebrum package in development mode
     - name: Install cerebrum special edition
       run: |
         python -m pip install -e Cerebrum/
-        
+       
     # Start AIOS kernel in background and wait for initialization
     - name: Run AIOS kernel in background
       run: |
         bash runtime/launch_kernel.sh &>logs &
         sleep 10  # Wait for kernel to fully start up
-        
+       
     # Run agent test with specified parameters
     - name: Run the run-agent code
       env:
@@ -63,7 +63,7 @@ jobs:
           --agent_name_or_path demo_author/demo_agent \
           --task "Tell me what is core idea of AIOS" \
           --aios_kernel_url http://localhost:8000
-        
+       
     # Upload log files as artifacts for debugging
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4.4.3
