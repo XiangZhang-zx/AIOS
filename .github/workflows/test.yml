@@ -1,3 +1,16 @@
+name: AIOS Application
+
+on:
+  # Trigger on push to main branch
+  push:
+    branches: [ "main" ]
+  # Trigger on pull requests to main branch
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
