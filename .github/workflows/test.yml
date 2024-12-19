@@ -46,13 +46,10 @@ jobs:
     
     - name: Run AIOS kernel in background
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0' }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
-        # Check if using default test key
-        if [ "$GEMINI_API_KEY" = "AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0" ]; then
-          echo "Notice: Using test API key - For testing purposes only"
-        fi
-        
+        # Set environment variable when starting kernel
+        export GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
         bash runtime/launch_kernel.sh &>logs &
         KERNEL_PID=$!
         
@@ -89,13 +86,8 @@ jobs:
     
     - name: Run the run-agent code
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0' }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
-        # Check if using default test key
-        if [ "$GEMINI_API_KEY" = "AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0" ]; then
-          echo "Notice: Using test API key - For testing purposes only"
-        fi
-        
         run-agent \
           --llm_name gemini-1.5-flash \
           --llm_backend google \
