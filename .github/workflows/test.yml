@@ -1,4 +1,7 @@
-name: Cerebrum-AIOS Integration Test
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: AIOS Application
 
 on:
   push:
@@ -12,45 +15,35 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-    # Clone AIOS
-    - name: Git Clone AIOS
-      uses: actions/checkout@v4
-      with:
-        repository: agiresearch/AIOS
-        path: aios_root
-        ref: main
 
-    # Verify AIOS clone
-    - name: Verify AIOS clone
-      run: |
-        echo "=== AIOS root directory contents ==="
-        ls -la aios_root/
-        echo "=== Looking for setup files ==="
-        find aios_root/ -name "setup.py" -o -name "pyproject.toml"
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: main  # Specify main branch
+    
     - name: Set up Python 3.10
       uses: actions/setup-python@v3
       with:
         python-version: "3.10"
-
-    # Install AIOS dependencies
-    - name: Install AIOS dependencies
-      working-directory: aios_root
+    
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    # Clone Cerebrum into AIOS directory
-    - name: Checkout Cerebrum
-      uses: actions/checkout@v4
+    
+    - name: Git Clone Action
+      # You may pin to the exact commit or the version.
+      # uses: sudosubin/git-clone-action@8a93ce24d47782e30077508cccacf8a05a891bae
+      uses: sudosubin/git-clone-action@v1.0.1
       with:
-        path: aios_root/Cerebrum
-        ref: ${{ github.ref }}
-
-    # Install Cerebrum
-    - name: Install Cerebrum
+        # Repository owner and name. Ex: sudosubin/git-clone-action
+        repository: agiresearch/Cerebrum
+        path: Cerebrum
+    
+    - name: Install cerebrum special edition
       run: |
-        python -m pip install -e aios_root/Cerebrum/
-    # Run AIOS kernel
+        python -m pip install -e Cerebrum/
+    
     - name: Run AIOS kernel in background
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0' }}
@@ -60,8 +53,7 @@ jobs:
           echo "Notice: Using test API key - For testing purposes only"
         fi
         
-        cd aios_root
-        bash runtime/launch_kernel.sh &>../kernel.log &
+        bash runtime/launch_kernel.sh &>logs &
         KERNEL_PID=$!
         
         # Set maximum wait time (10 seconds)
@@ -72,12 +64,12 @@ jobs:
         while true; do
           if ! ps -p $KERNEL_PID > /dev/null; then
             echo "Kernel process died. Checking logs:"
-            cat ../kernel.log
+            cat logs
             exit 1
           fi
           
           if nc -z localhost 8000; then
-            if curl -s http://localhost:8000/health; then
+            if curl -s http://localhost:8000/health > /dev/null; then
               echo "Kernel successfully started and healthy"
               break
             fi
@@ -87,15 +79,15 @@ jobs:
           elapsed=$((SECONDS - start_time))
           if [ $elapsed -ge $max_wait ]; then
             echo "Timeout after ${max_wait} seconds. Kernel failed to start properly."
-            cat ../kernel.log
+            cat logs
             exit 1
           fi
           
           echo "Waiting for kernel to start... (${elapsed}s elapsed)"
           sleep 1
         done
-    # Run integration test
-    - name: Run integration test
+    
+    - name: Run the run-agent code
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0' }}
       run: |
@@ -104,14 +96,6 @@ jobs:
           echo "Notice: Using test API key - For testing purposes only"
         fi
         
-        # Debug information
-        echo "Checking kernel status..."
-        curl -v http://localhost:8000/health || true
-        
-        echo "Network status:"
-        netstat -tlpn | grep 8000 || true
-        
-        # Run the test
         run-agent \
           --llm_name gemini-1.5-flash \
           --llm_backend google \
@@ -119,24 +103,22 @@ jobs:
           --task "Tell me what is core idea of AIOS" \
           --aios_kernel_url http://localhost:8000 \
           2>&1 | tee agent.log
-    # Upload logs
-    - name: Upload logs
-      if: always()
+    
+    - name: Upload a Build Artifact
+      if: always()  # Upload logs even if job fails
       uses: actions/upload-artifact@v4.4.3
       with:
-        name: test-logs
+        name: logs
         path: |
-          kernel.log
+          logs
           agent.log
-    # Debug information
-    - name: Debug information
+    
+    - name: Collect debug information
       if: failure()
       run: |
-        echo "=== Kernel log ==="
-        cat kernel.log
-        echo "=== Environment variables ==="
+        echo "=== Kernel Logs ==="
+        cat logs
+        echo "=== Environment Variables ==="
         env | grep -i api_key || true
-        echo "=== Process status ==="
+        echo "=== Process Status ==="
         ps aux | grep kernel
-        echo "=== Directory structure ==="
-        tree aios_main || true
