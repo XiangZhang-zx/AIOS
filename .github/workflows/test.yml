@@ -97,8 +97,13 @@ jobs:
     # Run integration test
     - name: Run integration test
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0' }}
       run: |
+        # Check if using default test key
+        if [ "$GEMINI_API_KEY" = "AIzaSyBlKDMWz_Ytv-D-_dIRkkvMdS5sSr7ZWR0" ]; then
+          echo "Notice: Using test API key - For testing purposes only"
+        fi
+        
         # Debug information
         echo "Checking kernel status..."
         curl -v http://localhost:8000/health || true
