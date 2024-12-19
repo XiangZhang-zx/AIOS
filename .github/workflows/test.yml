@@ -19,28 +19,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: main
+        ref: main  # Specify main branch
     
     - name: Set up Python 3.10
       uses: actions/setup-python@v3
       with:
         python-version: "3.10"
     
-    # Install AIOS dependencies first
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        python -m pip install -e .
     
-    # Clone and install Cerebrum
-    - name: Git Clone Cerebrum
+    - name: Git Clone Action
+      # You may pin to the exact commit or the version.
+      # uses: sudosubin/git-clone-action@8a93ce24d47782e30077508cccacf8a05a891bae
       uses: sudosubin/git-clone-action@v1.0.1
       with:
+        # Repository owner and name. Ex: sudosubin/git-clone-action
         repository: agiresearch/Cerebrum
         path: Cerebrum
     
-    - name: Install Cerebrum
+    - name: Install cerebrum special edition
       run: |
         python -m pip install -e Cerebrum/
     
@@ -48,8 +48,9 @@ jobs:
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
-        # Start kernel and save PID
-        bash runtime/launch_kernel.sh &>kernel.log &
+        # Set environment variable when starting kernel
+        export GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+        bash runtime/launch_kernel.sh &>logs &
         KERNEL_PID=$!
         
         # Set maximum wait time (10 seconds)
@@ -60,12 +61,12 @@ jobs:
         while true; do
           if ! ps -p $KERNEL_PID > /dev/null; then
             echo "Kernel process died. Checking logs:"
-            cat kernel.log
+            cat logs
             exit 1
           fi
           
           if nc -z localhost 8000; then
-            if curl -s http://localhost:8000/health; then
+            if curl -s http://localhost:8000/health > /dev/null; then
               echo "Kernel successfully started and healthy"
               break
             fi
@@ -75,7 +76,7 @@ jobs:
           elapsed=$((SECONDS - start_time))
           if [ $elapsed -ge $max_wait ]; then
             echo "Timeout after ${max_wait} seconds. Kernel failed to start properly."
-            cat kernel.log
+            cat logs
             exit 1
           fi
           
@@ -87,14 +88,11 @@ jobs:
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
-        # Debug info
-        echo "Checking kernel status..."
-        curl -v http://localhost:8000/health || true
-        
-        echo "Network status:"
-        netstat -tlpn | grep 8000 || true
-        
-        # Run agent
+        # Verify if API key is set
+        if [ -z "$GEMINI_API_KEY" ]; then
+          echo "Error: GEMINI_API_KEY is not set in GitHub Secrets"
+          exit 1
+        fi
         run-agent \
           --llm_name gemini-1.5-flash \
           --llm_backend google \
@@ -109,14 +107,14 @@ jobs:
       with:
         name: logs
         path: |
-          kernel.log
+          logs
           agent.log
     
     - name: Collect debug information
       if: failure()
       run: |
         echo "=== Kernel Logs ==="
-        cat kernel.log
+        cat logs
         echo "=== Environment Variables ==="
         env | grep -i api_key || true
         echo "=== Process Status ==="
