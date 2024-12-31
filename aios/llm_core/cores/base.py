@@ -21,10 +21,13 @@ class BaseLLM(ABC):
         max_new_tokens: int = 256,
         log_mode: str = "console",
         use_context_manager: bool = False,
+        api_key: str = None,  # Add API key parameter
     ):
         self.max_gpu_memory = max_gpu_memory
         self.eval_device = eval_device
         self.max_new_tokens = max_new_tokens
+
+        self.api_key = api_key  # Store API key
 
         self.log_mode = log_mode
 
@@ -38,12 +41,14 @@ class BaseLLM(ABC):
 
         self.logger.log("AIOS has been successfully initialized.\n", level="info")
 
-    def convert_map(self, map: dict) -> dict:
+    def convert_map(self, original_map: dict) -> dict:
         """helper utility to convert the keys of a map to int"""
-        new_map = {}
-        for k, v in map.items():
-            new_map[int(k)] = v
-        return new_map
+        if original_map:
+            new_map = {}
+            for k, v in original_map.items():
+                new_map[int(k)] = v
+            return new_map
+        return None
 
     def check_model_type(self, model_name):
         # TODO add more model types
@@ -100,6 +105,8 @@ class BaseLLM(ABC):
         json_object_pattern = r"\{\s*.*?\s*\}"
 
         match_array = re.search(json_array_pattern, message)
+        
+        # print(f"match_array: {match_array}")
 
         if match_array:
             json_array_substring = match_array.group(0)
